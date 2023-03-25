@@ -50,9 +50,10 @@ qtcreator-*
 # Catkin custom files
 CATKIN_IGNORE
 
-# Python
+# Python VS Code
 venv/
+.vscode/
 
 # Data
-**/*data*/*
-**/*log*/*
+**/*data*/
+**/*log*/

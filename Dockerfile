@@ -55,7 +55,7 @@ RUN wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-p
     dpkg -i packages-microsoft-prod.deb && rm packages-microsoft-prod.deb && \
     apt-get update && ACCEPT_EULA=Y apt-get install -y libk4a1.4 libk4a1.4-dev k4a-tools
 
-WORKDIR /root/ros_ws/scr
+WORKDIR /root/ros_ws/src
 RUN git clone https://github.com/microsoft/Azure_Kinect_ROS_Driver.git -b foxy-devel
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir xacro
