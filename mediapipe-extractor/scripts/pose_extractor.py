@@ -49,7 +49,8 @@ class PoseExtractor(Node):
 
     def rgb_callback(self, msg):
         image = self.cv_bridge.imgmsg_to_cv2(msg)
-        # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         results = self.pose.process(image)
 
@@ -62,7 +63,7 @@ class PoseExtractor(Node):
             landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style()
         )
 
-        cv2.imwrite('/root/ros_ws/src/mediapipe-extractor/scripts/image.png', image)
+        cv2.imwrite('/home/player001/gestures_ws/src/mediapipe-extractor/scripts/image.png', image)
         # cv2.imshow('Pose Extractor',
         #            resize_with_aspect_ratio(image, height=600),
         #            )

@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'mediapipe-extractor = mediapipe-extractor.pose_extractor:main',
+            'mediapipe-extractor = scripts.pose_extractor:main',
         ],
     },
 )
