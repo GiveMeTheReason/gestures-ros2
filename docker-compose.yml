@@ -1,0 +1,11 @@
+# version: '3'
+
+# services:
+#   azure-kinect-ros2:
+#     image: azurekinectros2
+#     build: .
+#     environment:
+#       - DISPLAY=${DISPLAY}
+#     container_name: azurekinectros2
+#     # stdin_open: true # docker run -i
+#     # tty: true # docker run -t
