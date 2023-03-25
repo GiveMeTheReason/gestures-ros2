@@ -70,4 +70,6 @@ RUN . /opt/ros/$ROS_DISTRO/setup.sh && \
     colcon build
 
 COPY ./azure-kinect/99-k4a.rules /etc/udev/rules.d/
-# CMD [ "source", "install/setup.bash" ]
+
+# Update ENTRYPOINT
+COPY ./ros_entrypoint.sh /

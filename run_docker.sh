@@ -10,7 +10,7 @@ xhost +local:docker
 # run with X11 forwarding
 docker build \
     -f "Dockerfile" \
-    -t azurekinectros2:latest "."
+    -t gestures-ros2:latest "."
 docker run \
     --rm \
     --privileged \
@@ -24,7 +24,7 @@ docker run \
     -v ./mediapipe/scripts:/root/ros_ws/scr/mediapipe/scripts:rw \
     -e XAUTHORITY=/tmp/.Xauthority \
     --env="DISPLAY" \
-    azurekinectros2:latest
+    gestures-ros2:latest
 
     # --network=host \
     # -e LIBGL_ALWAYS_INDIRECT=1 \
@@ -32,4 +32,4 @@ docker run \
     # -e QT_X11_NO_MITSHM=1 \
 
 # docker-compose up -d --build
-# docker run --rm -it -e DISPLAY=$DISPLAY azurekinectros2:latest
+# docker run --rm -it -e DISPLAY=$DISPLAY gestures-ros2:latest
