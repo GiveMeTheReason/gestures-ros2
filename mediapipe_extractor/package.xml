@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>mediapipe-extractor</name>
+  <name>mediapipe_extractor</name>
   <version>0.0.0</version>
   <description>Mediapipe pose extractor from Azure Kinect</description>
   <maintainer email="Timur.Bayburin@skoltech.ru">Timur Bayburin</maintainer>

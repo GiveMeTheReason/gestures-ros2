@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'mediapipe-extractor'
+package_name = 'mediapipe_extractor'
 
 setup(
     name=package_name,
@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'mediapipe-extractor = scripts.pose_extractor:main',
+            'mediapipe_extractor = scripts.pose_extractor:main',
         ],
     },
 )
