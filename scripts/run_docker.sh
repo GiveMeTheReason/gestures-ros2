@@ -20,8 +20,8 @@ docker run \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v ~/.Xauthority:/tmp/.Xauthority \
-    -v ./mediapipe_extractor/data_samples:/root/ros_ws/src/mediapipe_extractor/data_samples:ro \
-    -v ./mediapipe_extractor/scripts:/root/ros_ws/src/mediapipe_extractor/scripts:rw \
+    -v ./mediapipe_extractor:/root/ros_ws/src/mediapipe_extractor \
+    -v ./gestures_interfaces:/root/ros_ws/src/gestures_interfaces \
     -e XAUTHORITY=/tmp/.Xauthority \
     --env="DISPLAY" \
     gestures-ros2:latest

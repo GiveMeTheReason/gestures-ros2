@@ -51,25 +51,30 @@ RUN apt-get update && apt-get install -y  --allow-unauthenticated \
     mesa-common-dev:$ARCH \
     uuid-dev:$ARCH
 
+# Azure Kinect SDK
 RUN wget https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb && \
     dpkg -i packages-microsoft-prod.deb && rm packages-microsoft-prod.deb && \
     apt-get update && ACCEPT_EULA=Y apt-get install -y libk4a1.4 libk4a1.4-dev k4a-tools
 
+RUN wget -O /etc/udev/rules.d/99-k4a.rules \
+    https://github.com/microsoft/Azure-Kinect-Sensor-SDK/blob/develop/scripts/99-k4a.rules
+
+# Azure Kinect ROS driver
 WORKDIR /root/ros_ws/src
 RUN git clone https://github.com/microsoft/Azure_Kinect_ROS_Driver.git -b foxy-devel
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir xacro
 RUN apt-get -y install ros-foxy-joint-state-publisher
 
+# Mediapipe
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     mediapipe
 
+# Build all
 WORKDIR /root/ros_ws
 RUN . /opt/ros/$ROS_DISTRO/setup.sh && \
     colcon build
 
-COPY ./azure-kinect/99-k4a.rules /etc/udev/rules.d/
-
 # Update ENTRYPOINT
-COPY ./ros_entrypoint.sh /
+COPY ./scripts/ros_entrypoint.sh /
