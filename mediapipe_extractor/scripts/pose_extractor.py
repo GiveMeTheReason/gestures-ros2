@@ -40,6 +40,11 @@ def convert_to_array(landmarks) -> np.ndarray:
     return result
 
 
+def filter_visibility(points: np.ndarray, threshold: float):
+    # inplace function
+    points[points[:, 3] < threshold] = 0.0
+
+
 def screen_to_pixel_(points: np.ndarray, width: int, height: int):
     # inplace function
     points[:, 0] *= width
@@ -48,8 +53,7 @@ def screen_to_pixel_(points: np.ndarray, width: int, height: int):
 
 def attach_depth_(points: np.ndarray, depth_image: cv2.Mat):
     # inplace function
-    return
-    # depth_image[points[:, 1].astype(int), points[:, 0].astype(int)]
+    points[:, 2] = depth_image[points[:, 1].astype(int), points[:, 0].astype(int)]
 
 
 class PoseExtractor(Node):
@@ -106,33 +110,34 @@ class PoseExtractor(Node):
             return
 
         results = convert_to_array(landmarks.pose_landmarks.landmark)
+        filter_visibility(results, 0.9)
         screen_to_pixel_(results, self.width, self.height)
         attach_depth_(results, depth)
 
-        # for point in results:
-        #     cv2.circle(rgb, (int(point[0]), int(point[1])), 10, color=(0, 0, 255), thickness=-1)
-        #     cv2.circle(depth_rgb, (int(point[0]), int(point[1])), 10, color=(0, 0, 255), thickness=-1)
+        for point in results:
+            cv2.circle(rgb, (int(point[0]), int(point[1])), 10, color=(0, 0, 255), thickness=-1)
+            cv2.circle(depth_rgb, (int(point[0]), int(point[1])), 10, color=(0, 0, 255), thickness=-1)
 
-        # mp_drawing.draw_landmarks(
-        #     rgb,
-        #     landmarks.pose_landmarks,
-        #     mp_pose.POSE_CONNECTIONS,
-        #     landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style()
-        # )
+        mp_drawing.draw_landmarks(
+            rgb,
+            landmarks.pose_landmarks,
+            mp_pose.POSE_CONNECTIONS,
+            landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style()
+        )
 
-        # cv2.imshow('Pose Extractor',
-        #            resize_with_aspect_ratio(rgb, target_height=600),
-        # )
-        # cv2.imshow('Depth',
-        #            resize_with_aspect_ratio(depth_rgb, target_height=600),
-        # )
+        cv2.imshow('Pose Extractor',
+                   resize_with_aspect_ratio(rgb, target_height=600),
+        )
+        cv2.imshow('Depth',
+                   resize_with_aspect_ratio(depth_rgb, target_height=600),
+        )
 
-        cv2.imwrite('/home/player001/gestures_ws/src/image_rgb.png', rgb)
-        cv2.imwrite('/home/player001/gestures_ws/src/image_depth.png', depth_rgb)
-        np.save('/home/player001/gestures_ws/src/image_rgb.npy', rgb)
-        np.save('/home/player001/gestures_ws/src/image_depth.npy', depth)
-        # if cv2.waitKey(5) & 0xFF == 27:
-        #     rclpy.shutdown()
+        # cv2.imwrite('/home/player001/gestures_ws/src/image_rgb.png', rgb)
+        # cv2.imwrite('/home/player001/gestures_ws/src/image_depth.png', depth_rgb)
+        # np.save('/home/player001/gestures_ws/src/image_rgb.npy', rgb)
+        # np.save('/home/player001/gestures_ws/src/image_depth.npy', depth)
+        if cv2.waitKey(1) & 0xFF == 27:
+            rclpy.shutdown()
 
 
 def main(args=None):
