@@ -1,22 +1,53 @@
 #!/usr/bin/env python3
 
+import os
+os.environ['PYTHONPATH'] = (
+    ':/home/player001/gestures_ws/src/mediapipe_extractor/scripts/pose_classifier'
+    '/home/player001/gestures_ws/install/message_filters/local/lib/python3.10/dist-packages'
+    ':/home/player001/gestures_ws/install/mediapipe_extractor/lib/python3.10/site-packages'
+    ':/home/player001/gestures_ws/install/gestures_interfaces/local/lib/python3.10/dist-packages'
+    ':/opt/ros/humble/lib/python3.10/site-packages'
+    ':/opt/ros/humble/local/lib/python3.10/dist-packages'
+)
+
 import typing as tp
 import numpy as np
 
 import cv2
 import mediapipe as mp
+import message_filters
 import rclpy
+import torch
 from cv_bridge.core import CvBridge
 from rclpy.node import Node
-import message_filters
 from sensor_msgs.msg import CameraInfo, Image
-from transforms import tt
-from classifiers import BaselineClassifier
-import torch
+
+import kalman_filter
+import pose_classifier.visualizer.utils as utils
+import pose_classifier.model.classifiers as classifiers
+import pose_classifier.model.transforms as transforms
+
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_pose = mp.solutions.pose
+
+
+CHECHPOINT_PATH = 'checkpoint.pth'
+GESTURES_SET = (
+    'select',
+    # 'call',
+    'start',
+    # 'yes',
+    # 'no',
+)
+WITH_REJECTION = True
+
+
+class ModelState:
+    def __init__(self) -> None:
+        self.h_n = None
+        self.c_n = None
 
 
 def resize_with_aspect_ratio(
@@ -46,101 +77,6 @@ def landmarks_to_array(landmarks) -> np.ndarray:
 def filter_visibility(points: np.ndarray, threshold: float):
     # inplace function
     points[points[:, 3] < threshold] = 0.0
-
-
-def screen_to_pixel_(points: np.ndarray, width: int, height: int):
-    # inplace function
-    points[:, 0] *= width
-    points[:, 1] *= height
-
-
-def attach_depth_(points: np.ndarray, depth_image: cv2.Mat):
-    # inplace function
-    points[:, 2] = depth_image[points[:, 1].astype(int), points[:, 0].astype(int)]
-
-
-def points_in_screen(points: np.ndarray) -> np.ndarray:
-    return np.prod((0 <= points[:, :2]) * (points[:, :2] <= 1), axis=1).astype(bool)
-
-
-@tp.overload
-def screen_to_pixel(points: np.ndarray, width: int, height: int, inplace: tp.Literal[True]) -> None: ...
-@tp.overload
-def screen_to_pixel(points: np.ndarray, width: int, height: int, inplace: tp.Literal[False] = False) -> np.ndarray: ...
-def screen_to_pixel(
-    points: np.ndarray,
-    width: int,
-    height: int,
-    inplace: bool = False,
-):
-    if not inplace:
-        points = np.copy(points)
-    points[:, 0] *= width
-    points[:, 1] *= height
-    if not inplace:
-        return points
-
-
-@tp.overload
-def attach_depth(points: np.ndarray, depth_image: np.ndarray, inplace: tp.Literal[True]) -> None: ...
-@tp.overload
-def attach_depth(points: np.ndarray, depth_image: np.ndarray, inplace: tp.Literal[False] = False) -> np.ndarray: ...
-def attach_depth(
-    points: np.ndarray,
-    depth_image: np.ndarray,
-    inplace: bool = False,
-):
-    if not inplace:
-        points = np.copy(points)
-    points[:, 2] = depth_image[points[:, 1].astype(int), points[:, 0].astype(int)]
-    if not inplace:
-        return points
-
-
-@tp.overload
-def pixel_to_world(points: np.ndarray, intrinsic: np.ndarray, inplace: tp.Literal[True]) -> None: ...
-@tp.overload
-def pixel_to_world(points: np.ndarray, intrinsic: np.ndarray, inplace: tp.Literal[False] = False) -> np.ndarray: ...
-def pixel_to_world(
-    points: np.ndarray,
-    intrinsic: np.ndarray,
-    inplace: bool = False,
-):
-    if not inplace:
-        points = np.copy(points)
-    focal_x: float = intrinsic[0, 0]
-    focal_y: float = intrinsic[1, 1]
-    principal_x: float = intrinsic[0, 2]
-    principal_y: float = intrinsic[1, 2]
-    points[:, 0] = (points[:, 0] - principal_x) * points[:, 2] / focal_x
-    points[:, 1] = (points[:, 1] - principal_y) * points[:, 2] / focal_y
-    if not inplace:
-        return points
-
-
-def screen_to_world(
-    points: np.ndarray,
-    depth_image: np.ndarray,
-    intrinsic: np.ndarray,
-    inplace: bool = False,
-):
-    if not inplace:
-        points = np.copy(points)
-
-    height, width = depth_image.shape
-    screen_to_pixel(points, width, height, True)
-    attach_depth(points, depth_image, True)
-    pixel_to_world(points, intrinsic, True)
-
-    if not inplace:
-        return points
-
-
-def get_world_points(points: np.ndarray, depth_image: np.ndarray, intrinsic: np.ndarray) -> np.ndarray:
-    valid = points_in_screen(points)
-    points[~valid] = 0
-    points_world = screen_to_world(points, depth_image, intrinsic)
-    return points_world
 
 
 class PoseExtractor(Node):
@@ -186,23 +122,16 @@ class PoseExtractor(Node):
             min_tracking_confidence=0.5,
         )
 
-        CHECHPOINT_PATH = 'checkpoint.pth'
-        GESTURES_SET = (
-            'select',
-            'call',
-            'start',
-            'yes',
-            'no',
-        )
-        with_rejection = True
-        self.label_map = {gesture: i for i, gesture in enumerate(GESTURES_SET)}
-        if with_rejection:
-            self.label_map['_rejection'] = len(self.label_map)
+        self.label_map = {gesture: i for i, gesture in enumerate(GESTURES_SET, start=1)}
+        if WITH_REJECTION:
+            # self.label_map['_rejection'] = len(self.label_map)
+            self.label_map['_rejection'] = 0
 
-        self.inv_map = {value: key for key, value in self.label_map.items()}
+        self.inv_label_map = {value: key for key, value in self.label_map.items()}
 
-        self.transforms = tt
-        self.model = BaselineClassifier()
+        self.transforms = transforms.TestTransforms()
+        self.model_state = ModelState()
+        self.model = classifiers.LSTMClassifier(len(self.label_map))
         self.model.load_state_dict(torch.load(CHECHPOINT_PATH, map_location=torch.device('cpu')))
         self.model.eval()
 
@@ -211,9 +140,24 @@ class PoseExtractor(Node):
         self.height = msg.height
         self.camera_intrinsic = msg.k.reshape(3, 3)
 
+        self.depth_extractor = utils.DepthExtractor(
+            self.width,
+            self.height,
+            self.camera_intrinsic
+        )
+
+        self.kalman_filters = kalman_filter.KalmanFilters(
+            self.width,
+            self.height,
+            self.camera_intrinsic,
+        )
+
         self.destroy_subscription(self.camera_info_subscribtion)
 
     def rgbd_callback(self, rgb_image: Image, depth_image: Image):
+        if (self.camera_intrinsic == np.eye(1, dtype=np.float64)).all():
+            return
+
         rgb = self.cv_bridge.imgmsg_to_cv2(rgb_image)
         depth = self.cv_bridge.imgmsg_to_cv2(depth_image)
         depth_rgb = cv2.cvtColor((depth / depth.max() * 255).astype(np.uint8), cv2.COLOR_GRAY2RGB)
@@ -222,25 +166,36 @@ class PoseExtractor(Node):
         landmarks = self.pose_solver.process(rgb)
 
         if landmarks.pose_landmarks is not None:
-            pixel_points = landmarks_to_array(landmarks.pose_landmarks.landmark)
-            filter_visibility(pixel_points, 0.9)
-            screen_to_pixel_(pixel_points, self.width, self.height)
-            attach_depth_(pixel_points, depth)
+            mp_points = landmarks_to_array(landmarks.pose_landmarks.landmark)
+            frame_points = np.copy(mp_points[:, :3])
 
-            frame_points = landmarks_to_array(landmarks.pose_landmarks.landmark)[:, :3]
-            frame_points[25:] = 0.0
-            frame_points = get_world_points(frame_points, depth, self.camera_intrinsic)
+            # MP to World
+            valid = utils.points_in_screen(frame_points)
+            frame_points[~valid] = 0
+            self.depth_extractor.screen_to_world(frame_points, depth, True, True)
+
+            # Filtered points
+            if self.kalman_filters.filters is None:
+                self.kalman_filters.init_filters(frame_points)
+                filtered_points = np.copy(frame_points).reshape(-1)
+            else:
+                filtered_points = self.kalman_filters.make_filtering(
+                    mp_points[:, :3],
+                    frame_points,
+                )
 
             with torch.no_grad():
-                preds = self.model(self.transforms(frame_points).unsqueeze(0))
+                model_points = np.copy(filtered_points[None, ...])
+                prediction, self.model_state.h_n, self.model_state.c_n = self.model(self.transforms(model_points), self.model_state.h_n, self.model_state.c_n)
+                prediction_probs, prediction_label = prediction.max(dim=-1)
+                model_label = self.inv_label_map[int(prediction_label.item())]
 
-            label = self.inv_map[int(torch.argmax(preds).item())]
-            cv2.putText(rgb, label, (300, 300),
-                        cv2.FONT_HERSHEY_PLAIN, 3, (0, 255, 0), 5)
+            cv2.putText(rgb, model_label, (300, 300),
+                        cv2.FONT_HERSHEY_PLAIN, 10, (0, 255, 0), 8)
 
-            for point in pixel_points:
-                cv2.circle(rgb, (int(point[0]), int(point[1])), 10, color=(0, 0, 255), thickness=-1)
-                cv2.circle(depth_rgb, (int(point[0]), int(point[1])), 10, color=(0, 0, 255), thickness=-1)
+            for point in mp_points:
+                cv2.circle(rgb, (int(point[0]*self.width), int(point[1]*self.height)), 10, color=(0, 0, 255), thickness=-1)
+                cv2.circle(depth_rgb, (int(point[0]*self.width), int(point[1]*self.height)), 10, color=(0, 0, 255), thickness=-1)
 
             mp_drawing.draw_landmarks(
                 rgb,
@@ -248,6 +203,8 @@ class PoseExtractor(Node):
                 mp_pose.POSE_CONNECTIONS,
                 landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style()
             )
+        else:
+            self.kalman_filters.filters = None
 
         cv2.imshow('Pose Extractor',
                    resize_with_aspect_ratio(rgb, target_height=600),

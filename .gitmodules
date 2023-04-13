@@ -6,3 +6,6 @@
 	path = message_filters
 	url = https://github.com/ros2/message_filters
 	branch = foxy
+[submodule "pose_classifier"]
+	path = pose_classifier
+	url = https://github.com/GiveMeTheReason/pose_classifier
