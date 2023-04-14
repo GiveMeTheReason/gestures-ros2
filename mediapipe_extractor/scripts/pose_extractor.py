@@ -2,8 +2,9 @@
 
 import os
 os.environ['PYTHONPATH'] = (
-    ':/home/player001/gestures_ws/src/mediapipe_extractor/scripts/pose_classifier'
-    '/home/player001/gestures_ws/install/message_filters/local/lib/python3.10/dist-packages'
+    '/home/player001/gestures_ws/src/mediapipe_extractor/scripts/pose_classifier'
+    ':/home/player001/gestures_ws/src/pose_classifier'
+    ':/home/player001/gestures_ws/install/message_filters/local/lib/python3.10/dist-packages'
     ':/home/player001/gestures_ws/install/mediapipe_extractor/lib/python3.10/site-packages'
     ':/home/player001/gestures_ws/install/gestures_interfaces/local/lib/python3.10/dist-packages'
     ':/opt/ros/humble/lib/python3.10/site-packages'
@@ -36,18 +37,17 @@ mp_pose = mp.solutions.pose
 CHECHPOINT_PATH = 'checkpoint.pth'
 GESTURES_SET = (
     'select',
-    # 'call',
+    'call',
     'start',
-    # 'yes',
-    # 'no',
+    'yes',
+    'no',
 )
 WITH_REJECTION = True
 
 
 class ModelState:
     def __init__(self) -> None:
-        self.h_n = None
-        self.c_n = None
+        self.hidden_state = None
 
 
 def resize_with_aspect_ratio(
@@ -186,7 +186,7 @@ class PoseExtractor(Node):
 
             with torch.no_grad():
                 model_points = np.copy(filtered_points[None, ...])
-                prediction, self.model_state.h_n, self.model_state.c_n = self.model(self.transforms(model_points), self.model_state.h_n, self.model_state.c_n)
+                prediction, self.model_state.hidden_state = self.model(self.transforms(model_points), self.model_state.hidden_state)
                 prediction_probs, prediction_label = prediction.max(dim=-1)
                 model_label = self.inv_label_map[int(prediction_label.item())]
 
